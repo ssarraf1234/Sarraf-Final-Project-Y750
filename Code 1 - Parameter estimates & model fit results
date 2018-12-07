@@ -1,0 +1,187 @@
+library(Amelia)
+library(lavaan)
+library (psych)
+library(foreign)
+library(mice)
+library(semTools)
+library(xtable)
+
+setwd("K:/USERS/ssarraf/Misc/Courses/Y750/Semester Project/Data")
+
+#####Reading file and creating new ones############
+NSSErrProject <- read.spss("NSSErrProject.sav", to.data.frame=TRUE)
+
+
+sapply(NSSErrProject, class) # checking variable type
+
+describe(NSSErrProject)
+
+###imputing data sets for analysis######
+#the following creates imputed data separately and then runs analysis; good if running nested models.
+#library(Amelia)
+set.seed(123456)
+RRdata.amelia2 <- amelia(NSSErrProject, m = 5, p2s = FALSE, ords = c(17:29))
+write.amelia(obj=RRdata.amelia2, file.stem = "outdata")#writing out individual imputed files
+write.amelia(obj=RRdata.amelia2, file.stem = "stackeddata", separate = FALSE, orig.data = FALSE)#stacked data set
+RR.data.amelia2.imps <- RRdata.amelia2$imputations# need to use growth.mi with data that isn't a data frame 
+
+#sapply(RR.data.amelia2.imps, class)
+
+stackeddata <- read.csv("K:/USERS/ssarraf/Misc/Courses/Y750/Semester Project/Data/stackeddata.csv")
+
+
+##############Running LCM models####################
+
+##############################Base Model (no quadratic slope)########################
+
+RR.model.0 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+#Using all imputed data sets together to get parameter estimates and p-values
+RR.fit.1 <- growth.mi(RR.model.0, data = RR.data.amelia2.imps, estimator = "WLSMV")#use this aggregated result for paper's parameter table
+summary(RR.fit.1)
+print(summary(RR.fit.1), nd = 4) 
+
+
+#Getting model fit statistics for each imputed data set separately and then averaging
+RR.fit.0.a <- growth(RR.model.0, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV")
+RR.fit.0.b <- growth(RR.model.0, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV")
+RR.fit.0.c <- growth(RR.model.0, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV")
+RR.fit.0.d <- growth(RR.model.0, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV")
+RR.fit.0.e <- growth(RR.model.0, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV")
+
+fitMeasures(RR.fit.0.a, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.0.b, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.0.c, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.0.d, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.0.e, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+
+inspect(RR.fit.0.a, 'r2')
+inspect(RR.fit.0.b, 'r2')
+inspect(RR.fit.0.c, 'r2')
+inspect(RR.fit.0.d, 'r2')
+inspect(RR.fit.0.e, 'r2')
+
+
+
+##############################First Model with Quadratic Slope########################
+
+RR.model.1 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+s2 =~ 0*RR10 + 1*RR11 + 4*RR12 + 9*RR13 + 16*RR14 + 25*RR15 + 36*RR16 + 49*RR17 + 64*RR18
+#s3 =~ 0*RR10 + 1*RR11 + 8*RR12 + 27*RR13 + 64*RR14 + 125*RR15 + 216*RR16 + 343*RR17 + 512*RR18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+#Using all imputed data sets together to get parameter estimates and p-values
+RR.fit.1 <- growth.mi(RR.model.1, data = RR.data.amelia2.imps, estimator = "WLSMV")#use this aggregated result for paper's parameter table
+summary(RR.fit.1)
+print(summary(RR.fit.1), nd = 4)
+#checking model matrices for number of estimated parameters
+inspect(RR.fit.1)
+
+#Getting model fit statistics for each data set separately and then combining
+RR.fit.1.a <- growth(RR.model.1, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV")
+RR.fit.1.b <- growth(RR.model.1, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV")
+RR.fit.1.c <- growth(RR.model.1, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV")
+RR.fit.1.d <- growth(RR.model.1, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV")
+RR.fit.1.e <- growth(RR.model.1, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV")
+
+fitMeasures(RR.fit.1.a, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.1.b, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.1.c, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.1.d, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.1.e, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+
+inspect(RR.fit.1.a, 'r2')
+inspect(RR.fit.1.b, 'r2')
+inspect(RR.fit.1.c, 'r2')
+inspect(RR.fit.1.d, 'r2')
+inspect(RR.fit.1.e, 'r2')
+
+
+
+######################2nd Model with TICs and TVCs (final model for study)##########################
+
+
+#Covariates used for explaining slopes and intercepts plus incentives
+RR.model.3 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+s2 =~ 0*RR10 + 1*RR11 + 4*RR12 + 9*RR13 + 16*RR14 + 25*RR15 + 36*RR16 + 49*RR17 + 64*RR18
+i ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s2 ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+#time varying covariates
+RR10~Incent10
+RR11~Incent11
+RR12~Incent12
+RR13~Incent13
+RR14~Incent14
+RR15~Incent15
+RR16~Incent16
+RR17~Incent17
+RR18~Incent18
+RR15~LMS15
+RR16~LMS16
+RR17~LMS17
+RR18~LMS18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+
+#Using all imputed data sets together to get parameter estimates and p-values
+RR.fit.3 <- growth.mi(RR.model.3, data = RR.data.amelia2.imps, estimator = "WLSMV", ordered=c(18:30))#use this aggregated result for paper's parameter table
+summary(RR.fit.3)
+print(summary(RR.fit.3), nd = 4) 
+
+
+#Getting model fit statistics for each data set separately and then combining
+RR.fit.3.a <- growth(RR.model.3, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.b <- growth(RR.model.3, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.c <- growth(RR.model.3, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.d <- growth(RR.model.3, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.e <- growth(RR.model.3, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV", ordered=c(18:30))
+
+fitMeasures(RR.fit.3.a, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.3.b, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.3.c, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.3.d, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+fitMeasures(RR.fit.3.e, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr"))
+
+inspect(RR.fit.3.a, 'r2')
+inspect(RR.fit.3.b, 'r2')
+inspect(RR.fit.3.c, 'r2')
+inspect(RR.fit.3.d, 'r2')
+inspect(RR.fit.3.e, 'r2')
