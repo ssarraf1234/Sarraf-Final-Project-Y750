@@ -1,0 +1,249 @@
+library(Amelia)
+library(lavaan)
+library (psych)
+library(foreign)
+library(mice)
+library(semTools)
+library(xtable)
+
+setwd("K:/USERS/ssarraf/Misc/Courses/Y750/Semester Project/Data")
+
+#####Reading file and creating new ones############
+NSSErrProject <- read.spss("NSSErrProject.sav", to.data.frame=TRUE)
+
+
+sapply(NSSErrProject, class) # checking variable type
+
+describe(NSSErrProject)
+
+###imputing data sets for analysis######
+#the following creates imputed data separately and then runs analysis; good if running nested models.
+#library(Amelia)
+set.seed(123456)
+RRdata.amelia2 <- amelia(NSSErrProject, m = 5, p2s = FALSE, ords = c(17:29))
+write.amelia(obj=RRdata.amelia2, file.stem = "outdata")#writing out individual imputed files
+write.amelia(obj=RRdata.amelia2, file.stem = "stackeddata", separate = FALSE, orig.data = FALSE)#stacked data set
+RR.data.amelia2.imps <- RRdata.amelia2$imputations# need to use growth.mi with data that isn't a data frame 
+
+#sapply(RR.data.amelia2.imps, class)
+
+stackeddata <- read.csv("K:/USERS/ssarraf/Misc/Courses/Y750/Semester Project/Data/stackeddata.csv")
+
+
+##############Running LCM models####################
+
+####The following includes the constraining of parameters for LRT model comparison purposes
+
+##############################Base Model (no quadratic slope)########################
+
+RR.model.0 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+#time-invariant predictors
+i ~ 0*Public + 0*ZSize + 0*ZFT + 0*ZFemale + 0*ZAA + 0*ZLAT + 0*ZSR
+s ~ 0*Public + 0*ZSize + 0*ZFT + 0*ZFemale + 0*ZAA + 0*ZLAT + 0*ZSR
+#time varying covariates
+RR10~0*Incent10
+RR11~0*Incent11
+RR12~0*Incent12
+RR13~0*Incent13
+RR14~0*Incent14
+RR15~0*Incent15
+RR16~0*Incent16
+RR17~0*Incent17
+RR18~0*Incent18
+RR15~0*LMS15
+RR16~0*LMS16
+RR17~0*LMS17
+RR18~0*LMS18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+#Getting model fit statistics for each data set separately and then using to compare to M1 
+RR.fit.0.a <- growth(RR.model.0, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.0.b <- growth(RR.model.0, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.0.c <- growth(RR.model.0, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.0.d <- growth(RR.model.0, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.0.e <- growth(RR.model.0, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV", ordered=c(18:30))
+
+
+
+
+##############################First Model########################
+
+RR.model.1 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+s2 =~ 0*RR10 + 1*RR11 + 4*RR12 + 9*RR13 + 16*RR14 + 25*RR15 + 36*RR16 + 49*RR17 + 64*RR18
+#time-invariant predictors
+i ~ 0*Public + 0*ZSize + 0*ZFT + 0*ZFemale + 0*ZAA + 0*ZLAT + 0*ZSR
+s ~ 0*Public + 0*ZSize + 0*ZFT + 0*ZFemale + 0*ZAA + 0*ZLAT + 0*ZSR
+s2 ~ 0*Public + 0*ZSize + 0*ZFT + 0*ZFemale + 0*ZAA + 0*ZLAT + 0*ZSR
+#time varying covariates
+RR10~0*Incent10
+RR11~0*Incent11 
+RR12~0*Incent12
+RR13~0*Incent13
+RR14~0*Incent14
+RR15~0*Incent15
+RR16~0*Incent16
+RR17~0*Incent17
+RR18~0*Incent18
+RR15~0*LMS15
+RR16~0*LMS16
+RR17~0*LMS17
+RR18~0*LMS18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+#Getting model fit statistics for each data set separately and then combining
+RR.fit.1.a <- growth(RR.model.1, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.1.b <- growth(RR.model.1, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.1.c <- growth(RR.model.1, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.1.d <- growth(RR.model.1, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.1.e <- growth(RR.model.1, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV", ordered=c(18:30))
+
+
+# Model comparison using satorra.2000 estimation for WLSMV estimator with categorical variables 
+lavTestLRT(RR.fit.1.a, RR.fit.0.a, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.b, RR.fit.0.b, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.c, RR.fit.0.c, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.d, RR.fit.0.d, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.e, RR.fit.0.e, scaled.shifted = FALSE)
+
+
+
+
+
+######################2nd Model##########################
+#####################NOT USED in final paper#############
+
+
+#Covariates used for explaining slopes and intercepts
+RR.model.2 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+s2 =~ 0*RR10 + 1*RR11 + 4*RR12 + 9*RR13 + 16*RR14 + 25*RR15 + 36*RR16 + 49*RR17 + 64*RR18
+i ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s2 ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+#time varying covariates
+RR10~0*Incent10
+RR11~0*Incent11
+RR12~0*Incent12
+RR13~0*Incent13
+RR14~0*Incent14
+RR15~0*Incent15
+RR16~0*Incent16
+RR17~0*Incent17
+RR18~0*Incent18
+RR15~0*LMS15
+RR16~0*LMS16
+RR17~0*LMS17
+RR18~0*LMS18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+#Getting model fit statistics for each data set separately and then combining
+RR.fit.2.a <- growth(RR.model.2, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.2.b <- growth(RR.model.2, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.2.c <- growth(RR.model.2, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.2.d <- growth(RR.model.2, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.2.e <- growth(RR.model.2, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV", ordered=c(18:30))
+
+# Model comparison using satorra.2000 estimation for WLSMV estimator with categorical variables 
+lavTestLRT(RR.fit.1.a, RR.fit.2.a, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.b, RR.fit.2.b, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.c, RR.fit.2.c, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.d, RR.fit.2.d, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.1.e, RR.fit.2.e, scaled.shifted = FALSE)
+
+
+
+
+######################3rd Model##########################
+
+
+#Covariates used for explaining slopes and intercepts plus incentives
+RR.model.3 <- '
+# intercept
+i =~ 1*RR10 + 1*RR11 + 1*RR12 + 1*RR13 + 1*RR14 + 1*RR15 + 1*RR16 + 1*RR17 + 1*RR18
+s =~ 0*RR10 + 1*RR11 + 2*RR12 + 3*RR13 + 4*RR14 + 5*RR15 + 6*RR16 + 7*RR17 + 8*RR18
+s2 =~ 0*RR10 + 1*RR11 + 4*RR12 + 9*RR13 + 16*RR14 + 25*RR15 + 36*RR16 + 49*RR17 + 64*RR18
+i ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+s2 ~ Public + ZSize + ZFT + ZFemale + ZAA + ZLAT + ZSR
+#time varying covariates
+RR10~Incent10
+RR11~Incent11
+RR12~Incent12
+RR13~Incent13
+RR14~Incent14
+RR15~Incent15
+RR16~Incent16
+RR17~Incent17
+RR18~Incent18
+RR15~LMS15
+RR16~LMS16
+RR17~LMS17
+RR18~LMS18
+# residual variances
+RR10~~r*RR10
+RR11~~r*RR11
+RR12~~r*RR12
+RR13~~r*RR13
+RR14~~r*RR14
+RR15~~r*RR15
+RR16~~r*RR16
+RR17~~r*RR17
+RR18~~r*RR18'
+
+
+#Getting model fit statistics for each data set separately and then combining
+RR.fit.3.a <- growth(RR.model.3, data = stackeddata[stackeddata$imp==1,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.b <- growth(RR.model.3, data = stackeddata[stackeddata$imp==2,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.c <- growth(RR.model.3, data = stackeddata[stackeddata$imp==3,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.d <- growth(RR.model.3, data = stackeddata[stackeddata$imp==4,], estimator = "WLSMV", ordered=c(18:30))
+RR.fit.3.e <- growth(RR.model.3, data = stackeddata[stackeddata$imp==5,], estimator = "WLSMV", ordered=c(18:30))
+
+# Model comparison using satorra.2000 estimation for WLSMV estimator with categorical variables 
+lavTestLRT(RR.fit.3.a, RR.fit.2.a, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.b, RR.fit.2.b, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.c, RR.fit.2.c, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.d, RR.fit.2.d, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.e, RR.fit.2.e, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.e, RR.fit.2.e, scaled.shifted = FALSE)
+
+lavTestLRT(RR.fit.3.a, RR.fit.1.a, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.b, RR.fit.1.b, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.c, RR.fit.1.c, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.d, RR.fit.1.d, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.e, RR.fit.1.e, scaled.shifted = FALSE)
+lavTestLRT(RR.fit.3.e, RR.fit.1.e, scaled.shifted = FALSE)
